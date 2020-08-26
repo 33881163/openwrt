@@ -124,6 +124,7 @@ define Build/append-uImage-fakehdr
 		-s \
 		$@.fakehdr
 	cat $@.fakehdr >> $@
+	cat $@.fakehdr >> $(IMAGE_KERNEL).fakehdr
 endef
 
 define Build/tplink-safeloader
@@ -329,6 +330,8 @@ define Build/sysupgrade-tar
 		--board $(if $(BOARD_NAME),$(BOARD_NAME),$(DEVICE_NAME)) \
 		--kernel $(call param_get_default,kernel,$(1),$(IMAGE_KERNEL)) \
 		--rootfs $(call param_get_default,rootfs,$(1),$(IMAGE_ROOTFS)) \
+		--dtb $(call param_get_default,dtb,$(1),$(KDIR)/image-$(firstword $(DEVICE_DTS)).dtb) \
+		--ramdisk $(call param_get_default,ramdisk,$(1),$(IMAGE_KERNEL).fakehdr) \
 		$@
 endef
 

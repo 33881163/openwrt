@@ -7,6 +7,12 @@
 # 'kernel' partition on NAND contains the kernel
 CI_KERNPART="${CI_KERNPART:-kernel}"
 
+# 'dtb' partition on NAND contains the dtb
+CI_DTBPART="${CI_DTBPART:-dtb}"
+
+# 'ramdisk' partition on NAND contains the ramdisk
+CI_RAMDISKPART="${CI_RAMDISKPART:-ramdisk}"
+
 # 'ubi' partition on NAND contains UBI
 CI_UBIPART="${CI_UBIPART:-ubi}"
 
@@ -245,11 +251,15 @@ nand_upgrade_ubifs() {
 nand_upgrade_tar() {
 	local tar_file="$1"
 	local kernel_mtd="$(find_mtd_index $CI_KERNPART)"
+	local dtb_mtd="$(find_mtd_index $CI_DTBPART)"
+	local ramdisk_mtd="$(find_mtd_index $CI_RAMDISKPART)"
 
 	local board_dir=$(tar tf $tar_file | grep -m 1 '^sysupgrade-.*/$')
 	board_dir=${board_dir%/}
 
 	local kernel_length=$( (tar xf $tar_file ${board_dir}/kernel -O | wc -c) 2> /dev/null)
+	local dtb_length=$( (tar xf $tar_file ${board_dir}/dtb -O | wc -c) 2> /dev/null)
+	local ramdisk_length=$( (tar xf $tar_file ${board_dir}/ramdisk -O | wc -c) 2> /dev/null)
 	local rootfs_length=$( (tar xf $tar_file ${board_dir}/root -O | wc -c) 2> /dev/null)
 
 	local rootfs_type="$(identify_tar "$tar_file" ${board_dir}/root)"
@@ -258,9 +268,20 @@ nand_upgrade_tar() {
 	local has_env=0
 
 	[ "$kernel_length" != 0 -a -n "$kernel_mtd" ] && {
-		tar xf $tar_file ${board_dir}/kernel -O | mtd write - $CI_KERNPART
+		tar xf $tar_file ${board_dir}/kernel -O | mtd -e $CI_KERNPART write - $CI_KERNPART
+		sleep 1
 	}
 	[ "$kernel_length" = 0 -o ! -z "$kernel_mtd" ] && has_kernel=0
+	
+	[ "$dtb_length" != 0 -a -n "$dtb_mtd" ] && {
+		tar xf $tar_file ${board_dir}/dtb -O | mtd -e $CI_DTBPART write - $CI_DTBPART
+		sleep 1
+	}
+	
+	[ "$ramdisk_length" != 0 -a -n "$ramdisk_mtd" ] && {
+		tar xf $tar_file ${board_dir}/ramdisk -O | mtd -e $CI_RAMDISKPART write - $CI_RAMDISKPART
+		sleep 1
+	}
 
 	nand_upgrade_prepare_ubi "$rootfs_length" "$rootfs_type" "$has_kernel" "$has_env"
 
