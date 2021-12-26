@@ -1,5 +1,13 @@
 cmake_bool = $(patsubst %,-D%:BOOL=$(if $($(1)),ON,OFF),$(2))
 
+PKG_USE_NINJA ?= 1
+HOST_USE_NINJA ?= 1
+ifeq ($(PKG_USE_NINJA),1)
+  PKG_BUILD_PARALLEL ?= 1
+endif
+ifeq ($(HOST_USE_NINJA),1)
+  HOST_BUILD_PARALLEL ?= 1
+endif
 PKG_INSTALL:=1
 
 ifneq ($(findstring c,$(OPENWRT_VERBOSE)),)
@@ -10,6 +18,7 @@ endif
 CMAKE_BINARY_DIR = $(PKG_BUILD_DIR)$(if $(CMAKE_BINARY_SUBDIR),/$(CMAKE_BINARY_SUBDIR))
 CMAKE_SOURCE_DIR = $(PKG_BUILD_DIR)$(if $(CMAKE_SOURCE_SUBDIR),/$(CMAKE_SOURCE_SUBDIR))
 HOST_CMAKE_SOURCE_DIR = $(HOST_BUILD_DIR)$(if $(CMAKE_SOURCE_SUBDIR),/$(CMAKE_SOURCE_SUBDIR))
+HOST_CMAKE_BINARY_DIR = $(HOST_BUILD_DIR)$(if $(CMAKE_BINARY_SUBDIR),/$(CMAKE_BINARY_SUBDIR))
 MAKE_PATH = $(firstword $(CMAKE_BINARY_SUBDIR) .)
 
 ifeq ($(CONFIG_EXTERNAL_TOOLCHAIN),)
@@ -43,6 +52,34 @@ CMAKE_RANLIB:=$(call cmake_tool,$(TARGET_RANLIB))
 CMAKE_FIND_ROOT_PATH:=$(STAGING_DIR)/usr;$(TOOLCHAIN_DIR)$(if $(CONFIG_EXTERNAL_TOOLCHAIN),;$(CONFIG_TOOLCHAIN_ROOT))
 CMAKE_HOST_FIND_ROOT_PATH:=$(STAGING_DIR)/host;$(STAGING_DIR_HOSTPKG);$(STAGING_DIR_HOST)
 CMAKE_SHARED_LDFLAGS:=-Wl,-Bsymbolic-functions
+
+ifeq ($(HOST_USE_NINJA),1)
+  CMAKE_HOST_OPTIONS += -DCMAKE_GENERATOR="Ninja"
+
+  define Host/Compile/Default
+	+$(NINJA) -C $(HOST_CMAKE_BINARY_DIR) $(1)
+  endef
+
+  define Host/Install/Default
+	+$(NINJA) -C $(HOST_CMAKE_BINARY_DIR) install
+  endef
+
+  define Host/Uninstall/Default
+	+$(NINJA) -C $(HOST_CMAKE_BINARY_DIR) uninstall
+  endef
+endif
+
+ifeq ($(PKG_USE_NINJA),1)
+  CMAKE_OPTIONS += -DCMAKE_GENERATOR="Ninja"
+
+  define Build/Compile/Default
+	+$(NINJA) -C $(CMAKE_BINARY_DIR) $(1)
+  endef
+
+  define Build/Install/Default
+	+DESTDIR="$(PKG_INSTALL_DIR)" $(NINJA) -C $(CMAKE_BINARY_DIR) install
+  endef
+endif
 
 define Build/Configure/Default
 	mkdir -p $(CMAKE_BINARY_DIR)
@@ -97,7 +134,8 @@ endef
 Build/InstallDev = $(if $(CMAKE_INSTALL),$(Build/InstallDev/cmake))
 
 define Host/Configure/Default
-	(cd $(HOST_BUILD_DIR); \
+	mkdir -p "$(HOST_CMAKE_BINARY_DIR)"
+	(cd $(HOST_CMAKE_BINARY_DIR); \
 		CFLAGS="$(HOST_CFLAGS)" \
 		CXXFLAGS="$(HOST_CFLAGS)" \
 		LDFLAGS="$(HOST_LDFLAGS)" \

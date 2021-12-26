@@ -1,8 +1,6 @@
-# Copyright (C) 2006-2014 OpenWrt.org
+# SPDX-License-Identifier: GPL-2.0-only
 #
-# This is free software, licensed under the GNU General Public License v2.
-# See /LICENSE for more information.
-#
+# Copyright (C) 2006-2021 OpenWrt.org
 
 include $(TOPDIR)/rules.mk
 
@@ -679,6 +677,9 @@ ifeq ($(BUILD_VARIANT),supplicant-full-wolfssl)
   endef
 endif
 
+# Build hostapd-common before its dependents, to avoid
+# spurious rebuilds when building multiple variants.
+$(eval $(call BuildPackage,hostapd-common))
 $(eval $(call BuildPackage,hostapd))
 $(eval $(call BuildPackage,hostapd-basic))
 $(eval $(call BuildPackage,hostapd-basic-openssl))
@@ -705,7 +706,6 @@ $(eval $(call BuildPackage,wpa-supplicant-openssl))
 $(eval $(call BuildPackage,wpa-supplicant-wolfssl))
 $(eval $(call BuildPackage,wpa-cli))
 $(eval $(call BuildPackage,hostapd-utils))
-$(eval $(call BuildPackage,hostapd-common))
 $(eval $(call BuildPackage,eapol-test))
 $(eval $(call BuildPackage,eapol-test-openssl))
 $(eval $(call BuildPackage,eapol-test-wolfssl))
